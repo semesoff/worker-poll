@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"worker-poll/input"
 	"worker-poll/models"
+	"worker-poll/utils"
 	"worker-poll/worker"
 )
 
@@ -32,7 +32,7 @@ func NewManager(channels models.Channels, wg *sync.WaitGroup) *Manager {
 	}
 }
 
-func (m *Manager) Start(commands []string) {
+func (m *Manager) Start(commands []string, interrupt chan os.Signal) {
 	for {
 		select {
 		case <-m.channels.Interrupt.Done():
@@ -46,33 +46,38 @@ func (m *Manager) Start(commands []string) {
 				case commands[0]:
 					m.ListWorkers()
 				case commands[1]:
-					m.AddWorker()
-				case commands[2]:
-					if len(v.Args) == 0 {
-						fmt.Println("Count args must be one")
+					if argInt, err := utils.CheckArgs(v.Args); err == nil {
+						m.AddWorkers(argInt)
 					} else {
-						arg := v.Args[0]
-						if argInt, err := strconv.Atoi(arg); err != nil {
-							fmt.Println("Arg must be a number")
-						} else {
-							m.RemoveWorker(argInt)
-						}
+						fmt.Println(err)
 					}
+				case commands[2]:
+					if argInt, err := utils.CheckArgs(v.Args); err == nil {
+						m.RemoveWorker(argInt)
+					} else {
+						fmt.Println(err)
+					}
+				case commands[3]:
+					m.RemoveAllWorkers()
+				case commands[4]:
+					interrupt <- os.Interrupt
 				}
 			}
 		}
 	}
 }
 
-// AddWorker - добавление воркера
-func (m *Manager) AddWorker() {
-	m.lastWorkerID++
-	m.countWorkers++
-	cancelChan := make(chan struct{}, 1)
-	m.hashWorkers[m.lastWorkerID] = cancelChan
-	m.wg.Add(1)
-	go worker.StartWorker(&m.channels, cancelChan, m.wg, m.lastWorkerID)
-	fmt.Printf("Added worker #%d\n", m.lastWorkerID)
+// AddWorkers - добавление воркера
+func (m *Manager) AddWorkers(n int) {
+	for i := 0; i < n; i++ {
+		m.lastWorkerID++
+		m.countWorkers++
+		cancelChan := make(chan struct{}, 1)
+		m.hashWorkers[m.lastWorkerID] = cancelChan
+		m.wg.Add(1)
+		go worker.StartWorker(&m.channels, cancelChan, m.wg, m.lastWorkerID)
+		fmt.Printf("Added worker #%d\n", m.lastWorkerID)
+	}
 }
 
 // RemoveWorker - удаление воркера по id
@@ -83,6 +88,17 @@ func (m *Manager) RemoveWorker(id int) {
 		m.countWorkers--
 	} else {
 		fmt.Printf("Not found worker with id: %d\n", id)
+	}
+}
+
+// RemoveAllWorkers - удаление всех воркеров
+func (m *Manager) RemoveAllWorkers() {
+	if m.countWorkers == 0 {
+		fmt.Println("No workers to remove")
+		return
+	}
+	for id := range m.hashWorkers {
+		m.RemoveWorker(id)
 	}
 }
 
@@ -99,12 +115,12 @@ func (m *Manager) ListWorkers() {
 }
 
 func main() {
-	size := 10 // размер канала для строк (входных данных)
+	const size = 10 // размер канала для строк (входных данных)
 	channels := models.Channels{
 		InputData: make(chan string, size), // канал строк (входные данные)
 		Interrupt: context.Background(),    // канал завершения работы программы (Ctrl + C)
 	}
-	commands := []string{"list", "addworker", "removeworker"}
+	commands := []string{"list", "add", "remove", "clear", "exit"}
 	wg := &sync.WaitGroup{}
 	wg.Add(3) // Manager, InputManager, Interrupt Catcher
 
@@ -115,12 +131,7 @@ func main() {
 
 	// Initialize and start Manager
 	manager := NewManager(channels, wg)
-	go manager.Start(commands)
-
-	// Start few workers
-	for i := 0; i < 2; i++ {
-		manager.AddWorker()
-	}
+	go manager.Start(commands, interrupt)
 
 	// Initialize and start Input Manager
 	inputManager := input.NewInputManager(channels, wg, manager.commands)
