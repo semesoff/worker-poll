@@ -28,17 +28,21 @@ func (im *InputManager) Start(commands []string) {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Список команд:\n" +
 		"list - список воркеров\n" +
-		"addworker - добавить воркера\n" +
-		"removeworker id - удалить воркера по его id")
+		"add <n> - добавить воркера (n - кол-во)\n" +
+		"remove <id> - удалить воркера (id - идентификатор)\n" +
+		"clear - удаление всех воркеров\n" +
+		"exit - выход из программы")
 
 	inputChan := make(chan string)
 	go func() {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			close(inputChan)
-			return
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				close(inputChan)
+				return
+			}
+			inputChan <- line
 		}
-		inputChan <- line
 	}()
 
 	for {
@@ -55,7 +59,7 @@ func (im *InputManager) Start(commands []string) {
 			if len(args) == 0 {
 				continue
 			}
-			if cmd := args[0]; slices.Contains(commands, cmd) {
+			if cmd := strings.ToLower(args[0]); slices.Contains(commands, cmd) {
 				im.commands <- models.Commands{
 					Cmd:  cmd,
 					Args: args[1:],
