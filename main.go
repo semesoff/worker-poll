@@ -61,6 +61,8 @@ func (m *Manager) Start(commands []string, interrupt chan os.Signal) {
 					m.RemoveAllWorkers()
 				case commands[4]:
 					interrupt <- os.Interrupt
+				case commands[5]:
+					fmt.Println("Count workers: ", m.countWorkers)
 				}
 			}
 		}
@@ -76,8 +78,8 @@ func (m *Manager) AddWorkers(n int) {
 		m.hashWorkers[m.lastWorkerID] = cancelChan
 		m.wg.Add(1)
 		go worker.StartWorker(&m.channels, cancelChan, m.wg, m.lastWorkerID)
-		fmt.Printf("Added worker #%d\n", m.lastWorkerID)
 	}
+	fmt.Printf("Added %d workers\n", n)
 }
 
 // RemoveWorker - удаление воркера по id
@@ -120,7 +122,7 @@ func main() {
 		InputData: make(chan string, size), // канал строк (входные данные)
 		Interrupt: context.Background(),    // канал завершения работы программы (Ctrl + C)
 	}
-	commands := []string{"list", "add", "remove", "clear", "exit"}
+	commands := []string{"list", "add", "remove", "clear", "exit", "count"}
 	wg := &sync.WaitGroup{}
 	wg.Add(3) // Manager, InputManager, Interrupt Catcher
 

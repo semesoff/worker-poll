@@ -30,8 +30,10 @@ func (im *InputManager) Start(commands []string) {
 		"list - список воркеров\n" +
 		"add <n> - добавить воркера (n - кол-во)\n" +
 		"remove <id> - удалить воркера (id - идентификатор)\n" +
+		"count - кол-во воркеров\n" +
 		"clear - удаление всех воркеров\n" +
-		"exit - выход из программы")
+		"exit - выход из программы\n" +
+		": любое слово не из команд - входные данные (строки)")
 
 	inputChan := make(chan string)
 	go func() {
