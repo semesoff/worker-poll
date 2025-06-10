@@ -128,8 +128,8 @@ func main() {
 
 	// Start interrupt catcher
 	go func() {
-		select {
-		case <-interrupt:
+		for {
+			<-interrupt
 			cancel()
 			wg.Done()
 			return
